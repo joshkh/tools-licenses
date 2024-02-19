@@ -40,6 +40,7 @@
 (defn- prep-project
   "Prepares the project and returns the lib-map for it."
   []
+  (println "prepping project")
   (let [basis   (b/create-basis {})
         lib-map (d/resolve-deps basis {})
         _       (d/prep-libs! lib-map {:action :prep :log :info} {})]  ; Make sure everything is "prepped" (downloaded locally) before we start looking for licenses
@@ -49,17 +50,20 @@
   "Converts lice-comb specific LicenseRefs to a human readable name (and colours
   them yellow), but leaves other expressions unchanged."
   [exp]
+  (println "expression-minus-license-refs")
   (if (lcm/lice-comb-license-ref? exp)
     (ansi/fg-bright :yellow (lcm/id->name exp))
     exp))
 
 (defn- dep-and-license-expressions
   [dep-name license-expressions]
+  (println "dep-and-license-expressions")
   (let [sorted-license-expressions (seq (sort (if (map? license-expressions) (keys license-expressions) license-expressions)))]
     (str dep-name " [" (if sorted-license-expressions (s/join ", " (map expression-minus-license-refs sorted-license-expressions)) (ansi/fg-bright :red "No licenses found")) "]")))
 
 (defn- dep-and-licenses->string
   [[dep-ga dep-info :as dep]]
+  (println "dep-and-licenses->string")
   (let [dep-ga              (str dep-ga)
         dep-v               (lcd/dep->version dep)
         license-expressions (:lice-comb/license-info dep-info)]
@@ -88,6 +92,7 @@
 (defn- summary-output!
   "Emit summary output to stdout."
   [proj-expressions-info deps-lib-map-with-info]
+  (println "summary-output!")
   (let [proj-expressions (sort (keys proj-expressions-info))
         freqs            (frequencies (filter identity (mapcat #(keys (get % :lice-comb/license-info)) (vals deps-lib-map-with-info))))
         deps-expressions (seq (sort (keys freqs)))
@@ -97,7 +102,7 @@
       (println (s/join ", " proj-expressions))
       (println "- no license information found -"))
     (println (ansi/bold "\nLicense Expression                                           # of Deps"
-                        "\n------------------------------------------------------------ ---------"))
+               "\n------------------------------------------------------------ ---------"))
     (if (or deps-expressions (pos? no-license-count))
       (do
         (run! #(println (str (fit-width 60 (expression-minus-license-refs %)) " " (fit-width 9 (str (get freqs %)) false))) deps-expressions)
@@ -108,6 +113,7 @@
 (defn- detailed-output!
   "Emit detailed output to stdout."
   [opts proj-expressions-info deps-lib-map-with-info]
+  (println "detailed-output!")
   (let [expressions     (sort (keys proj-expressions-info))
         direct-deps     (into {} (remove (fn [[_ v]] (seq (:dependents v))) deps-lib-map-with-info))
         transitive-deps (into {} (filter (fn [[_ v]] (seq (:dependents v))) deps-lib-map-with-info))]
@@ -137,26 +143,28 @@
     (str (ansi/bold (expression-minus-license-refs expr)) " "
       (when-let [info-list (sort-by lcu/expression-info-sort-by-keyfn (seq (get m expr)))]
         (s/join "\n" (map #(str (when-let [md-id (:id %)] (when (not= expr md-id) (ansi/bold (str "  " (expression-minus-license-refs md-id) " "))))
-                                (case (:type %)
-                                  :declared  (ansi/fg-bright :green  "Declared")
-                                  :concluded (ansi/fg-bright :yellow "Concluded"))
-                                (when-let [confidence (:confidence %)]   (str (ansi/bold "\n  Confidence: ")
-                                                                              (case confidence
-                                                                                :low    (ansi/fg-bright :red    "low")
-                                                                                :medium (ansi/fg-bright :yellow "medium")
-                                                                                :high   (ansi/fg-bright :green  "high"))))
-                                (when-let [strategy   (:strategy %)]     (str (ansi/bold "\n  Strategy: ") (get lcu/strategy->string strategy (name strategy))))
-                                (when-let [source     (seq (map remove-file-prefix (:source %)))] (str (ansi/bold "\n  Source:") "\n    " (s/join "\n    " source))))
-                          info-list))))))
+                             (case (:type %)
+                               :declared  (ansi/fg-bright :green  "Declared")
+                               :concluded (ansi/fg-bright :yellow "Concluded"))
+                             (when-let [confidence (:confidence %)]   (str (ansi/bold "\n  Confidence: ")
+                                                                        (case confidence
+                                                                          :low    (ansi/fg-bright :red    "low")
+                                                                          :medium (ansi/fg-bright :yellow "medium")
+                                                                          :high   (ansi/fg-bright :green  "high"))))
+                             (when-let [strategy   (:strategy %)]     (str (ansi/bold "\n  Strategy: ") (get lcu/strategy->string strategy (name strategy))))
+                             (when-let [source     (seq (map remove-file-prefix (:source %)))] (str (ansi/bold "\n  Source:") "\n    " (s/join "\n    " source))))
+                       info-list))))))
 
 (defn- explain-with-licenses!
   [dep-expr-info]
+  (println "explain-with-licenses!")
   (let [exprs (sort (keys dep-expr-info))]
     (println (ansi/bold "Licenses:") (s/join ", " (map expression-minus-license-refs exprs)) "\n")
     (println (s/join "\n\n" (map (partial expression-info->string dep-expr-info) exprs)) "\n")))
 
 (defn- explain-without-licenses!
   [dep]
+  (println "explain-without-licenses!")
   (println (ansi/bold "Licenses:") (ansi/fg-bright :red "No licenses found"))
   (println (ansi/bold "\nLocations checked:"))
   (println (s/join "\n" (map remove-file-prefix (lcd/dep->locations dep))))
@@ -165,6 +173,7 @@
 (defn- explain-output!
   "Emit explain output to stdout."
   [[ga _ :as dep] dep-expr-info]
+  (println "explain-output!")
   (if ga
     (if-let [version (lcd/dep->version dep)]
       (do
@@ -179,7 +188,7 @@
   "Emit EDN output to stdout."
   [opts proj-expressions-info deps-lib-map-with-info]
   (pp/pprint (into {(:lib opts) {:this-project true :lice-comb/license-info proj-expressions-info :paths [(.getCanonicalPath (io/file "."))]}}
-                   deps-lib-map-with-info)))
+               deps-lib-map-with-info)))
 
 (defn licenses
   "Lists all licenses used transitively by the project.
@@ -195,6 +204,7 @@
   Note: has the side effect of 'prepping' your project with its transitive
   dependencies (i.e. downloading them if they haven't already been downloaded)."
   [opts]
+  (println "licenses")
   (let [lib-map     (prep-project)
         output-type (get opts :output :summary)]
     (if (= :explain output-type)
@@ -237,6 +247,7 @@
   Note: has the side effect of 'prepping' your project with its transitive
   dependencies (i.e. downloading them if they haven't already been downloaded)."
   [opts]
+  (println "check-asf-policy")
   (let [lib-map                   (prep-project)
         proj-licenses             (distinct (mapcat #(sexp/extract-ids (sexp/parse %)) (lcf/dir->expressions ".")))
         lib-map-with-license-info (lcd/deps-expressions lib-map)
@@ -244,17 +255,17 @@
                                                (if expressions
                                                  (asf/expressions-least-category expressions)
                                                  :uncategorised))  ; Don't forget about deps without any license info
-                                            lib-map-with-license-info)]
+                                    lib-map-with-license-info)]
     (when-not (seq (filter (partial = "Apache-2.0") proj-licenses))
       (println (ansi/bold (ansi/fg-bright :red "Your project is not Apache-2.0 licensed; this report is likely meaningless.\n"))))
     (case (get opts :output :summary)
       :summary  (do
                   (println (ansi/bold "\nASF Category                  # of Deps"
-                                      "\n----------------------------- ---------"))
+                             "\n----------------------------- ---------"))
                   (run! (fn [category]
                           (println (str (fit-width 30 (asf-category->ansi-string category))
-                                        (fit-width 9  (count (get dep-licenses-by-category category)) false))))
-                        asf/categories)
+                                     (fit-width 9  (count (get dep-licenses-by-category category)) false))))
+                    asf/categories)
                   (println))
       :detailed (do
                   (println)
@@ -262,5 +273,5 @@
                           (when-let [deps-in-category (seq (sort (map first (get dep-licenses-by-category category))))]
                             (run! #(println (str % "@" (lcd/dep->version [% (get lib-map %)]) " [" (asf-category->ansi-string category) "]")) deps-in-category)
                             (println)))
-                        asf/categories))
+                    asf/categories))
       :edn      (pp/pprint dep-licenses-by-category))))
